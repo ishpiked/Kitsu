@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "buildCommand": "pip install -r requirements.txt",
+  "devCommand": "python run.py",
+  "installCommand": "pip install -r requirements.txt",
+  "framework": null,
+  "functions": {
+    "app/server.py": {
+      "maxDuration": 30,
+      "runtime": "python3.12"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "app/server.py"
+    },
+    {
+      "src": "/webhook",
+      "dest": "app/server.py"
+    },
+    {
+      "src": "/health",
+      "dest": "app/server.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app/server.py"
+    }
+  ],
+  "env": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1"
+  }
+}
