@@ -4,12 +4,16 @@
   "devCommand": "python run.py",
   "installCommand": "pip install -r requirements.txt",
   "framework": null,
-  "functions": {
-    "app/server.py": {
-      "maxDuration": 30,
-      "runtime": "python3.12"
+  "builds": [
+    {
+      "src": "app/server.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.12"
+      }
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
