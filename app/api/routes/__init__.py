@@ -9,9 +9,15 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
+_bot_application = None
+
 
 async def get_bot_application():
-    return await create_application()
+    global _bot_application
+    if _bot_application is None:
+        _bot_application = await create_application()
+        await _bot_application.initialize()
+    return _bot_application
 
 
 @router.get("/health")
@@ -31,5 +37,3 @@ async def webhook(request: Request) -> Response:
     except Exception as e:
         logger.error("webhook_error", error=str(e))
         return Response(content="Error", status_code=500)
-    finally:
-        await application.shutdown()
