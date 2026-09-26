@@ -8,75 +8,119 @@ from database.tokens import get_token, save_token
 
 app = FastAPI()
 
+LOGO_SVG = """<span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none" aria-hidden="true"><defs><linearGradient id="catGradient" x1="215" y1="175" x2="425" y2="450" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ED1235"/><stop offset="0.48" stop-color="#F32245"/><stop offset="1" stop-color="#FF526C"/></linearGradient></defs><style>.eye{transform-box:fill-box;transform-origin:center;animation:blink 5s ease-in-out infinite}.eye.right{animation-delay:.03s}@keyframes blink{0%,43%,48%,100%{transform:scaleY(1)}45%,46.5%{transform:scaleY(.06)}}.whisker{transform-box:fill-box;transform-origin:center;animation:whiskerMove 3.2s ease-in-out infinite}.whisker.left.lower{animation-delay:.18s}.whisker.right{animation-delay:.12s}.whisker.right.lower{animation-delay:.27s}@keyframes whiskerMove{0%,100%{transform:rotate(0)}25%{transform:rotate(-2.5deg)}50%{transform:rotate(1.5deg)}75%{transform:rotate(-1deg)}}.cat-head{transform-box:fill-box;transform-origin:center;animation:headFloat 4s ease-in-out infinite}@keyframes headFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}</style><g class="cat-head"><path fill="url(#catGradient)" d="M223.5 175.5Q221 177 218.5 181.5Q216 186 215 205.5Q214 225 220 231.5Q226 238 224.5 239.5Q223 241 219 242.5Q215 244 214 247Q213 250 217.5 254.5Q222 259 217 263.5Q212 268 212 276Q212 284 211 288.5Q210 293 204 300.5Q198 308 194 314.5Q190 321 186 334Q182 347 181.5 355Q181 363 182 371Q183 379 186 388Q189 397 194.5 406Q200 415 207.5 422.5Q215 430 221 434Q227 438 237 442Q247 446 255.5 447.5Q264 449 311.5 449Q359 449 371.5 446Q384 443 393.5 438Q403 433 414 422Q425 411 429 404Q433 397 436 388Q439 379 440 368Q441 357 440 349.5Q439 342 436.5 334.5Q434 327 434 321.5Q434 316 442.5 275Q451 234 451 231.5Q451 229 449.5 226Q448 223 445 220.5Q442 218 437.5 217.5Q433 217 428.5 219.5Q424 222 392.5 245.5Q361 269 356.5 270.5Q352 272 339.5 272Q327 272 323.5 271Q320 270 315.5 266Q311 262 277 220.5Q243 179 239.5 176.5Q236 174 231 174Q226 174 223.5 175.5Z"/><g class="eye left"><path fill="#FFFFFF" d="M291 361C291 394 278 415 251 415C222 415 204 394 204 363C204 331 224 309 252 309C278 309 291 331 291 361Z"/><path fill="url(#catGradient)" d="M282 367C282 385 275 398 264 398C253 398 245 385 245 367C245 349 253 336 264 336C275 336 282 349 282 367Z"/></g><g class="eye right"><path fill="#FFFFFF" d="M420 363C420 395 403 415 375 415C346 415 329 394 329 364C329 331 348 309 375 309C403 309 420 332 420 363Z"/><path fill="url(#catGradient)" d="M379 369C379 387 372 400 361 400C350 400 343 387 343 369C343 351 350 338 361 338C372 338 379 351 379 369Z"/></g></g><g class="whisker left"><path d="M160 398 L174 394" stroke="url(#catGradient)" stroke-width="9" stroke-linecap="round"/></g><g class="whisker left lower"><path d="M153 434 L179 420" stroke="url(#catGradient)" stroke-width="9" stroke-linecap="round"/></g><g class="whisker right"><path d="M450 394 L463 398" stroke="url(#catGradient)" stroke-width="9" stroke-linecap="round"/></g><g class="whisker right lower"><path d="M461 420 L486 434" stroke="url(#catGradient)" stroke-width="9" stroke-linecap="round"/></g></svg></span>"""
+
+FONT_HEAD = """<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap" rel="stylesheet" />"""
+
 PAGE_CSS = """
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: -apple-system, 'Segoe UI', Roboto, Overpass, sans-serif;
-  background: #0b1622 radial-gradient(ellipse 80% 60% at 50% -10%, #1e3a5f 0%, transparent 60%);
-  color: #edf1f5;
+  font-family: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  background: #0D0D0F;
+  color: #FFFFFF;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
+  -webkit-font-smoothing: antialiased;
 }
 .card {
-  background: #151f2e;
-  border-radius: 16px;
-  padding: 48px 40px 40px;
-  max-width: 420px;
+  background: #161619;
+  border: 1px solid #29292E;
+  border-radius: 18px;
+  max-width: 400px;
   width: 100%;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,.5);
-  border: 1px solid rgba(61,180,242,.15);
+  overflow: hidden;
 }
-.badge {
-  width: 72px; height: 72px;
-  border-radius: 50%;
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #29292E;
+}
+.wordmark { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: .2px; }
+.wordmark .logo { display: inline-flex; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; background: #0D0D0F; border: 1px solid #29292E; }
+.wordmark .logo svg { width: 100%; height: 100%; display: block; }
+.wordmark small { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; color: #A5A5AA; display: block; line-height: 1; margin-top: 2px; }
+.pill {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  padding: 5px 10px; border-radius: 999px;
+}
+.pill.ok { color: #F21D45; background: rgba(242,29,69,.12); border: 1px solid rgba(242,29,69,.35); }
+.pill.err { color: #A5A5AA; background: transparent; border: 1px solid #29292E; }
+.main { padding: 28px 24px 24px; text-align: left; }
+.ava {
+  width: 60px; height: 60px; border-radius: 16px;
+  object-fit: cover; display: block;
+  border: 1px solid #29292E;
+  margin-bottom: 18px;
+}
+.mark {
+  width: 48px; height: 48px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 34px; margin: 0 auto 20px;
+  margin-bottom: 18px; border: 1px solid #29292E;
+  background: #0D0D0F;
 }
-.badge.ok { background: rgba(46, 204, 113, .15); border: 2px solid #2ecc71; }
-.badge.err { background: rgba(231, 76, 60, .12); border: 2px solid #e74c3c; }
-.avatar {
-  width: 84px; height: 84px; border-radius: 50%;
-  object-fit: cover; margin: 0 auto 16px; display: block;
-  border: 3px solid #3db4f2;
+.mark svg { display: block; }
+.eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  color: #A5A5AA; margin-bottom: 8px;
 }
-h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
-h1 .user { color: #3db4f2; }
-p { color: #9fadbd; font-size: 15px; line-height: 1.6; }
-p.hint {
-  margin-top: 20px; padding-top: 20px;
-  border-top: 1px solid rgba(255,255,255,.07);
-  font-size: 13px;
+h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
+h1 span { color: #FF4968; }
+.sub { color: #A5A5AA; font-size: 14px; line-height: 1.6; margin-top: 10px; }
+.userline {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 18px; padding: 12px 14px;
+  background: #0D0D0F; border: 1px solid #29292E; border-radius: 12px;
+  font-size: 14px;
 }
+.userline .dot { width: 8px; height: 8px; border-radius: 50%; background: #F21D45; flex-shrink: 0; }
+.userline b { font-weight: 650; }
+.userline small { color: #A5A5AA; margin-left: auto; font-size: 12px; }
 .btn {
-  display: inline-block; margin-top: 24px;
-  background: #3db4f2; color: #0b1622;
-  font-weight: 700; font-size: 15px;
-  padding: 12px 32px; border-radius: 10px;
-  text-decoration: none; transition: transform .15s, box-shadow .15s;
+  display: block; text-align: center; margin-top: 20px;
+  background: #F21D45; color: #FFFFFF;
+  font-weight: 700; font-size: 14px;
+  padding: 14px; border-radius: 12px;
+  text-decoration: none;
 }
-.btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(61,180,242,.4); }
-.brand { margin-top: 28px; font-size: 12px; color: #647380; letter-spacing: .5px; }
-.brand b { color: #3db4f2; }
+.btn:active { background: #c81638; }
+.ghost {
+  display: block; text-align: center; margin-top: 10px;
+  color: #A5A5AA; font-size: 13px; text-decoration: none;
+  padding: 10px;
+}
+.foot { padding: 14px 20px; border-top: 1px solid #29292E; font-size: 12px; color: #A5A5AA; }
+@media (max-width: 440px) { .main { padding: 24px 20px 20px; } }
 """
 
 
-def success_page(name: str, avatar: str | None) -> str:
-    img = f'<img class="avatar" src="{avatar}" alt="{name}" />' if avatar else '<div class="badge ok">✓</div>'
+def success_page(name: str, avatar: str | None, user_id: int | None = None) -> str:
+    if avatar:
+        visual = f'<img class="ava" src="{avatar}" alt="" />'
+    else:
+        visual = (
+            '<div class="mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none">'
+            '<path d="M4 12.5l5 5L20 6.5" stroke="#F21D45" stroke-width="2.5" '
+            'stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+        )
+    idtag = f"<small>ID {user_id}</small>" if user_id else "<small>AniList</small>"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Linked to AniList</title><style>{PAGE_CSS}</style></head>
+<title>Connected — Kitsu</title>{FONT_HEAD}<style>{PAGE_CSS}</style></head>
 <body><div class="card">
-{img}
-<h1>Linked as <span class="user">{name}</span></h1>
-<p>Your AniList account is connected.<br />Your lists will now stay in sync via Telegram.</p>
-<a class="btn" href="https://t.me/">Back to Telegram</a>
-<p class="hint">You can safely close this tab and return to your chat.</p>
-<div class="brand"><b>Kitsu</b> • AniList on Telegram</div>
+<div class="top"><div class="wordmark">{LOGO_SVG}<span>Kitsu<small>ANILIST ON TELEGRAM</small></span></div><div class="pill ok">CONNECTED</div></div>
+<div class="main">
+{visual}
+<div class="eyebrow">ANILIST ACCOUNT</div>
+<h1>You&rsquo;re in, <span>{name}</span></h1>
+<p class="sub">Account linked. Anything you update from Telegram syncs straight to your AniList.</p>
+<div class="userline"><span class="dot"></span><b>{name}</b>{idtag}</div>
+<a class="btn" href="https://t.me/">Return to Telegram</a>
+</div>
+<div class="foot">You can close this tab now.</div>
 </div></body></html>"""
 
 
@@ -84,13 +128,19 @@ def error_page(title: str, detail: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Login failed</title><style>{PAGE_CSS}</style></head>
+<title>Login failed — Kitsu</title>{FONT_HEAD}<style>{PAGE_CSS}</style></head>
 <body><div class="card">
-<div class="badge err">✕</div>
+<div class="top"><div class="wordmark">{LOGO_SVG}<span>Kitsu<small>ANILIST ON TELEGRAM</small></span></div><div class="pill err">FAILED</div></div>
+<div class="main">
+<div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+<path d="M6 6l12 12M18 6L6 18" stroke="#A5A5AA" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+<div class="eyebrow">LOGIN ISSUE</div>
 <h1>{title}</h1>
-<p>{detail}</p>
-<p class="hint">Go back to Telegram and send <b>/login</b> to try again with a fresh link.</p>
-<div class="brand"><b>Kitsu</b> • AniList on Telegram</div>
+<p class="sub">{detail}</p>
+<a class="btn" href="https://t.me/">Back to Telegram</a>
+<a class="ghost" href="https://t.me/">Send /login again for a fresh link</a>
+</div>
+<div class="foot">Codes expire fast and work only once.</div>
 </div></body></html>"""
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -184,7 +234,7 @@ async def callback(code: str = "", state: str = ""):
     save_token(chat_id, token)
     send_message(chat_id, f"You're linked as {viewer['name']} ✅ You can now use /me.")
 
-    return HTMLResponse(success_page(viewer["name"], viewer.get("avatar")))
+    return HTMLResponse(success_page(viewer["name"], viewer.get("avatar"), viewer.get("id")))
 
 
 @app.get("/")
