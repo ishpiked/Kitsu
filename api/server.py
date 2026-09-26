@@ -5,8 +5,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from anilist.auth import build_authorize_url, exchange_code_for_token, fetch_viewer, fetch_viewer_name
+from anilist.media import clean_description, media_title, prequel_sequel, search_characters, search_media
 from anilist.profile import fetch_user_profile
-from database.tokens import get_token, pop_login_message, save_login_message, save_token
+from database.tokens import get_token, pop_login_message, remove_token, save_login_message, save_token
 
 app = FastAPI()
 
@@ -191,31 +192,138 @@ def delete_message(chat_id: int, message_id: int) -> None:
         pass
 
 
-def send_profile(chat_id: int, caption: str, banner: str | None) -> None:
+def send_profile(chat_id: int, caption: str, banner: str | None, reply_markup: dict | None = None) -> None:
     """Profile goes out on the banner image when one exists, else as text."""
     if not banner:
-        send_message(chat_id, caption)
+        send_message(chat_id, caption, reply_markup=reply_markup)
         return
     try:
+        payload: dict = {
+            "chat_id": chat_id,
+            "photo": banner,
+            "caption": caption,
+            "parse_mode": "HTML",
+        }
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
         resp = requests.post(
             f"{TELEGRAM_API}/sendPhoto",
-            json={
-                "chat_id": chat_id,
-                "photo": banner,
-                "caption": caption,
-                "parse_mode": "HTML",
-            },
+            json=payload,
             timeout=15,
         )
         if resp.json().get("ok"):
             return
     except Exception:
         pass
-    send_message(chat_id, caption)
+    send_message(chat_id, caption, reply_markup=reply_markup)
 
 
 def login_keyboard(login_url: str) -> dict:
     return {"inline_keyboard": [[{"text": "Connect AniList Account", "url": login_url}]]}
+
+
+def _format_name(value: str | None) -> str:
+    if value in ("TV", "OVA", "ONA"):
+        return value
+    return (value or "").capitalize()
+
+
+def _media_facts(m: dict, kind: str) -> str:
+    parts = [_format_name(m.get("format")) or kind]
+    if kind == "anime" and m.get("episodes"):
+        parts.append(f'{m["episodes"]:,} episodes')
+    if kind == "manga" and m.get("chapters"):
+        parts.append(f'{m["chapters"]:,} chapters')
+    if kind == "manga" and m.get("volumes"):
+        parts.append(f'{m["volumes"]:,} volumes')
+    year = (m.get("startDate") or {}).get("year")
+    if year:
+        parts.append(str(year))
+    line = ", ".join(p for p in parts if p) + "."
+    if m.get("averageScore"):
+        line += f' Score: {m["averageScore"]}%.'
+    return line
+
+
+def anime_details(m: dict) -> tuple[str, dict]:
+    title = html.escape(media_title(m))
+    parts = [f'<b><a href="{m["siteUrl"]}">{title}</a></b>']
+    desc = clean_description(m.get("description"))
+    if desc:
+        parts += ["", html.escape(desc)]
+    genres = [html.escape(g) for g in (m.get("genres") or [])[:5]]
+    if genres:
+        parts += ["", ", ".join(genres)]
+    parts += ["", _media_facts(m, "anime")]
+    rows = []
+    pre, seq = prequel_sequel(m)
+    nav = []
+    if pre:
+        nav.append({"text": "Prequel", "url": pre["siteUrl"]})
+    if seq:
+        nav.append({"text": "Sequel", "url": seq["siteUrl"]})
+    if nav:
+        rows.append(nav)
+    rows.append([{"text": "View on AniList", "url": m["siteUrl"]}])
+    return "\n".join(parts), {"inline_keyboard": rows}
+
+
+def manga_details(m: dict) -> tuple[str, dict]:
+    title = html.escape(media_title(m))
+    parts = [f'<b><a href="{m["siteUrl"]}">{title}</a></b>']
+    desc = clean_description(m.get("description"))
+    if desc:
+        parts += ["", html.escape(desc)]
+    genres = [html.escape(g) for g in (m.get("genres") or [])[:5]]
+    if genres:
+        parts += ["", ", ".join(genres)]
+    parts += ["", _media_facts(m, "manga")]
+    keyboard = {"inline_keyboard": [[{"text": "View on AniList", "url": m["siteUrl"]}]]}
+    return "\n".join(parts), keyboard
+
+
+def result_list(items: list[dict], header: str) -> str:
+    lines = [f"<b>{header}</b>", ""]
+    for i, m in enumerate(items, 1):
+        title = html.escape(media_title(m))
+        bits = []
+        year = (m.get("startDate") or {}).get("year")
+        if year:
+            bits.append(str(year))
+        if m.get("averageScore"):
+            bits.append(f'score {m["averageScore"]}%')
+        suffix = f' ({", ".join(bits)})' if bits else ""
+        lines.append(f'{i}. <a href="{m["siteUrl"]}">{title}</a>{suffix}')
+    return "\n".join(lines)
+
+
+def character_list(items: list[dict], query: str) -> str:
+    lines = [f"<b>Characters matching {html.escape(query)}.</b>", ""]
+    for i, c in enumerate(items, 1):
+        name = html.escape((c.get("name") or {}).get("full") or "Unknown")
+        known = ", ".join(
+            html.escape((n.get("title") or {}).get("romaji") or "")
+            for n in (c.get("media") or {}).get("nodes", []) or []
+        ).strip(", ")
+        suffix = f" ({known})" if known else ""
+        lines.append(f'{i}. <a href="{c["siteUrl"]}">{name}</a>{suffix}')
+    return "\n".join(lines)
+
+
+def usage_text(kind: str, example: str) -> str:
+    return (
+        f"<b>{kind}.</b>\n"
+        "\n"
+        f"Add a title after the command. Example: {example}"
+    )
+
+
+def no_matches(query: str) -> str:
+    return (
+        "<b>No matches.</b>\n"
+        "\n"
+        f"Nothing found for {html.escape(query)}. Check the spelling and try again."
+    )
 
 
 @app.post("/webhook")
@@ -229,8 +337,11 @@ async def webhook(request: Request):
 
     text = message.get("text") or ""
     chat_id = message["chat"]["id"]
+    base, _, arg = text.partition(" ")
+    base = base.split("@")[0].strip().lower()
+    arg = arg.strip()
 
-    if text == "/start":
+    if base == "/start":
         start_text = (
             "Welcome to AniList Bot.\n"
             "\n"
@@ -251,7 +362,7 @@ async def webhook(request: Request):
             if start_id is not None:
                 save_login_message(chat_id, start_id)
 
-    elif text == "/login":
+    elif base == "/login":
         old_prompt = pop_login_message(chat_id)
         if old_prompt is not None:
             delete_message(chat_id, old_prompt)
@@ -268,7 +379,7 @@ async def webhook(request: Request):
         if prompt_id is not None:
             save_login_message(chat_id, prompt_id)
 
-    elif text == "/me":
+    elif base == "/me":
         token = get_token(chat_id)
         if not token:
             send_message(
@@ -321,6 +432,89 @@ async def webhook(request: Request):
                     "\n"
                     "Send /login to connect again.",
                 )
+
+    elif base == "/anime":
+        if not arg:
+            send_message(chat_id, usage_text("Anime search", "/anime Frieren"))
+        else:
+            found = search_media(arg, "ANIME", 1)
+            if not found:
+                send_message(chat_id, no_matches(arg))
+            else:
+                caption, keyboard = anime_details(found[0])
+                send_profile(chat_id, caption, (found[0].get("coverImage") or {}).get("large"), reply_markup=keyboard)
+
+    elif base == "/anilist":
+        if not arg:
+            send_message(chat_id, usage_text("Anime list search", "/anilist Fate"))
+        else:
+            found = search_media(arg, "ANIME", 5)
+            if not found:
+                send_message(chat_id, no_matches(arg))
+            else:
+                send_message(chat_id, result_list(found, f"Anime matching {html.escape(arg)}."))
+
+    elif base == "/manga":
+        if not arg:
+            send_message(chat_id, usage_text("Manga search", "/manga Berserk"))
+        else:
+            found = search_media(arg, "MANGA", 1)
+            if not found:
+                send_message(chat_id, no_matches(arg))
+            else:
+                caption, keyboard = manga_details(found[0])
+                send_profile(chat_id, caption, (found[0].get("coverImage") or {}).get("large"), reply_markup=keyboard)
+
+    elif base == "/character":
+        if not arg:
+            send_message(chat_id, usage_text("Character search", "/character Levi"))
+        else:
+            found = search_characters(arg, 5)
+            if not found:
+                send_message(chat_id, no_matches(arg))
+            else:
+                send_message(chat_id, character_list(found, arg))
+
+    elif base == "/anihelp":
+        send_message(
+            chat_id,
+            "<b>Anime commands.</b>\n"
+            "\n"
+            "/anime, details on one anime with prequel and sequel links.\n"
+            "/anilist, list of anime matching a query.\n"
+            "/manga, details on one manga.\n"
+            "/character, characters matching a name.\n"
+            "\n"
+            "More commands are on the way.",
+        )
+
+    elif base == "/auth":
+        login_url = build_authorize_url(chat_id)
+        auth_id = send_message(
+            chat_id,
+            "<b>AniList authorization.</b>\n"
+            "\n"
+            "Kitsu needs access to update your lists. Tap below to approve, then return here.",
+            reply_markup=login_keyboard(login_url),
+        )
+        if auth_id is not None:
+            save_login_message(chat_id, auth_id)
+
+    elif base == "/logout":
+        if remove_token(chat_id):
+            send_message(
+                chat_id,
+                "<b>Logged out.</b>\n"
+                "\n"
+                "This chat is disconnected from AniList.",
+            )
+        else:
+            send_message(
+                chat_id,
+                "<b>Nothing to disconnect.</b>\n"
+                "\n"
+                "This chat has no linked account.",
+            )
 
     return {"ok": True}
 

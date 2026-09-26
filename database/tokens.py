@@ -19,6 +19,10 @@ def get_token(telegram_id: int) -> str | None:
     return _tokens.get(telegram_id)
 
 
+def remove_token(telegram_id: int) -> bool:
+    return _tokens.pop(telegram_id, None) is not None
+
+
 def save_login_message(telegram_id: int, message_id: int) -> None:
     _login_messages[telegram_id] = message_id
 
