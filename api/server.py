@@ -1,3 +1,4 @@
+import html
 import os
 import requests
 from fastapi import FastAPI, Request
@@ -154,14 +155,21 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
-def send_message(chat_id: int, text: str) -> None:
+def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> None:
     if not BOT_TOKEN:
         return
+    payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     requests.post(
         f"{TELEGRAM_API}/sendMessage",
-        json={"chat_id": chat_id, "text": text},
+        json=payload,
         timeout=10,
     )
+
+
+def login_keyboard(login_url: str) -> dict:
+    return {"inline_keyboard": [[{"text": "Connect AniList Account", "url": login_url}]]}
 
 
 @app.post("/webhook")
@@ -173,48 +181,69 @@ async def webhook(request: Request):
     if not message:
         return {"ok": True}
 
-    text = message.get("text", "")
+    text = message.get("text") or ""
     chat_id = message["chat"]["id"]
 
     if text == "/start":
-        welcome_message = (
-            """Welcome to AniList Bot.
-
-Your personal anime and manga companion, now available directly on Telegram. Connect your AniList account and explore a complete catalog of anime and manga, discover new titles, view detailed information, and keep track of everything you're watching or reading.
-
-You can search for titles, explore characters, studios, genres, and recommendations, check what's currently airing, and manage your AniList library without leaving Telegram.
-
-Get started by connecting your AniList account and explore everything AniList has to offer, right from your chat.
-"""
-        )
-
-        requests.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={
-                "chat_id": chat_id,
-                "text": welcome_message
-            },
-            timeout=10
+        send_message(
+            chat_id,
+            "<b>Kitsu, AniList on Telegram.</b>\n"
+            "\n"
+            "Welcome. Kitsu brings your AniList library to Telegram so you can search anime and manga, view details, and manage your lists without leaving chat.\n"
+            "\n"
+            "To unlock list updates and sync, connect your AniList account first.\n"
+            "\n"
+            "<b>Begin here:</b>\n"
+            "Send /login to connect your account.\n"
+            "Send /me to check your link status.\n"
+            "\n"
+            "Your lists stay in sync with AniList whenever you update them here.",
         )
 
     elif text == "/login":
         login_url = build_authorize_url(chat_id)
         send_message(
             chat_id,
-            f"Tap to connect your AniList account:\n{login_url}\n\n"
-            "After approving, you'll land back here and I'll confirm you're linked.",
+            "<b>Connect your AniList account.</b>\n"
+            "\n"
+            "Tap the button below to open AniList and approve access for Kitsu. After approval you will return here and Kitsu will confirm the link.\n"
+            "\n"
+            "If the button does not open, send /login again for a fresh link. Links expire fast and work only once.",
+            reply_markup=login_keyboard(login_url),
         )
 
     elif text == "/me":
         token = get_token(chat_id)
         if not token:
-            send_message(chat_id, "You're not linked yet. Send /login to connect.")
+            send_message(
+                chat_id,
+                "<b>No linked account found.</b>\n"
+                "\n"
+                "Kitsu cannot read your lists yet because no AniList account is connected to this chat.\n"
+                "\n"
+                "Send /login to connect your account, then try /me again.",
+            )
         else:
             name = fetch_viewer_name(token)
             if name:
-                send_message(chat_id, f"You're linked as {name} ✅")
+                safe_name = html.escape(name)
+                send_message(
+                    chat_id,
+                    f"<b>Linked account: {safe_name}.</b>\n"
+                    "\n"
+                    "Kitsu is connected to this AniList profile. Updates you make here will sync to your AniList lists.\n"
+                    "\n"
+                    "Use /login any time to switch accounts.",
+                )
             else:
-                send_message(chat_id, "Your token looks expired. Send /login again.")
+                send_message(
+                    chat_id,
+                    "<b>Link check failed.</b>\n"
+                    "\n"
+                    "The saved token for this chat is expired or invalid, so Kitsu cannot reach your AniList profile right now.\n"
+                    "\n"
+                    "Send /login to connect again with a fresh link.",
+                )
 
     return {"ok": True}
 
@@ -239,7 +268,15 @@ async def callback(code: str = "", state: str = ""):
         return HTMLResponse(error_page("Could not verify account", "Got a token but couldn't read your AniList profile."), status_code=400)
 
     save_token(chat_id, token)
-    send_message(chat_id, f"You're linked as {viewer['name']} ✅ You can now use /me.")
+    safe_name = html.escape(viewer["name"])
+    send_message(
+        chat_id,
+        f"<b>Account linked: {safe_name}.</b>\n"
+        "\n"
+        "Kitsu is now connected to this AniList profile. You can close the browser tab and return to chat.\n"
+        "\n"
+        "Send /me to verify your link any time.",
+    )
 
     return HTMLResponse(success_page(viewer["name"], viewer.get("avatar"), viewer.get("id")))
 
