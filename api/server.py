@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from anilist.auth import build_authorize_url, exchange_code_for_token, fetch_viewer, fetch_viewer_name
+from anilist.profile import fetch_user_profile
 from database.tokens import get_token, pop_login_message, save_login_message, save_token
 
 app = FastAPI()
@@ -202,16 +203,23 @@ async def webhook(request: Request):
     chat_id = message["chat"]["id"]
 
     if text == "/start":
-        send_message(
-            chat_id,
+        start_text = (
             "<b>Kitsu, AniList on Telegram.</b>\n"
             "\n"
             "Search anime and manga, view details, and manage your AniList lists without leaving chat.\n"
             "\n"
-            "<b>To begin:</b>\n"
-            "Send /login to connect your account.\n"
-            "Send /me to check your link status.",
+            "Connect your account to unlock list updates and sync."
         )
+        if get_token(chat_id):
+            send_message(chat_id, start_text)
+        else:
+            start_id = send_message(
+                chat_id,
+                start_text,
+                reply_markup=login_keyboard(build_authorize_url(chat_id)),
+            )
+            if start_id is not None:
+                save_login_message(chat_id, start_id)
 
     elif text == "/login":
         old_prompt = pop_login_message(chat_id)
@@ -238,17 +246,21 @@ async def webhook(request: Request):
                 "Send /login to connect, then try again.",
             )
         else:
-            name = fetch_viewer_name(token)
-            if name:
-                safe_name = html.escape(name)
-                send_message(
-                    chat_id,
-                    f"<b>{safe_name}.</b>\n"
-                    "\n"
-                    "This chat is linked to that AniList profile.\n"
-                    "\n"
-                    "Use /login to switch accounts.",
-                )
+            profile = fetch_user_profile(token)
+            if profile:
+                safe_name = html.escape(profile["name"] or "Unknown")
+                lines = [f'<b><a href="{profile["site_url"]}">{safe_name}</a></b>']
+                if profile["about"]:
+                    lines += ["", html.escape(profile["about"])]
+                lines += [
+                    "",
+                    "<b>Anime</b>",
+                    f'{profile["anime_count"]:,} titles, {profile["episodes_watched"]:,} episodes watched',
+                    "",
+                    "<b>Manga</b>",
+                    f'{profile["manga_count"]:,} titles, {profile["chapters_read"]:,} chapters read',
+                ]
+                send_message(chat_id, "\n".join(lines))
             else:
                 send_message(
                     chat_id,
