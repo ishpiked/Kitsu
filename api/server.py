@@ -325,7 +325,7 @@ async def callback(code: str = "", state: str = ""):
         chat_id,
         f"<b>Connected as {safe_name}.</b>\n"
         "\n"
-        "All set. Your lists are ready to sync.",
+        "Your AniList account is now connected successfully. Everything is set up, and your anime and manga lists are ready to sync.",
     )
 
     return HTMLResponse(success_page(viewer["name"], viewer.get("avatar"), viewer.get("id")))
