@@ -47,15 +47,26 @@ def exchange_code_for_token(code: str) -> str | None:
 
 def fetch_viewer_name(access_token: str) -> str | None:
     """Verify token by fetching Viewer { name }. Returns username or None."""
+    viewer = fetch_viewer(access_token)
+    return viewer["name"] if viewer else None
+
+
+def fetch_viewer(access_token: str) -> dict | None:
+    """Fetch Viewer { id name avatar { large } }. Returns dict or None."""
     resp = requests.post(
         ANILIST_GRAPHQL_URL,
-        json={"query": "query { Viewer { name } }"},
+        json={"query": "query { Viewer { id name avatar { large } } }"},
         headers={"Authorization": f"Bearer {access_token}"},
         timeout=15,
     )
     if resp.status_code != 200:
         return None
     try:
-        return resp.json()["data"]["Viewer"]["name"]
-    except (KeyError, TypeError):
+        v = resp.json()["data"]["Viewer"]
+        return {
+            "id": v.get("id"),
+            "name": v.get("name"),
+            "avatar": (v.get("avatar") or {}).get("large"),
+        }
+    except (KeyError, TypeError, AttributeError):
         return None
