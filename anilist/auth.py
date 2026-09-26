@@ -26,19 +26,21 @@ def build_authorize_url(telegram_id: int) -> str:
 
 def exchange_code_for_token(code: str) -> str | None:
     """Exchange authorization `code` for a long-lived access token."""
+    # AniList expects form-encoded body + HTTP Basic auth (client_id:client_secret),
+    # NOT JSON body. JSON body gives {"error":"invalid_client"}.
     resp = requests.post(
         ANILIST_TOKEN_URL,
-        json={
+        data={
             "grant_type": "authorization_code",
-            "client_id": ANILIST_CLIENT_ID,
-            "client_secret": ANILIST_CLIENT_SECRET,
-            "redirect_uri": ANILIST_REDIRECT_URI,
             "code": code,
+            "redirect_uri": ANILIST_REDIRECT_URI,
         },
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        auth=(str(ANILIST_CLIENT_ID), str(ANILIST_CLIENT_SECRET)),
+        headers={"Accept": "application/json"},
         timeout=15,
     )
     if resp.status_code != 200:
+        print(f"[auth] token exchange failed {resp.status_code}: {resp.text}")
         return None
     return resp.json().get("access_token")
 
