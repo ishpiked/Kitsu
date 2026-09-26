@@ -189,15 +189,11 @@ async def webhook(request: Request):
             chat_id,
             "<b>Kitsu, AniList on Telegram.</b>\n"
             "\n"
-            "Welcome. Kitsu brings your AniList library to Telegram so you can search anime and manga, view details, and manage your lists without leaving chat.\n"
+            "Search anime and manga, view details, and manage your AniList lists without leaving chat.\n"
             "\n"
-            "To unlock list updates and sync, connect your AniList account first.\n"
-            "\n"
-            "<b>Begin here:</b>\n"
+            "<b>To begin:</b>\n"
             "Send /login to connect your account.\n"
-            "Send /me to check your link status.\n"
-            "\n"
-            "Your lists stay in sync with AniList whenever you update them here.",
+            "Send /me to check your link status.",
         )
 
     elif text == "/login":
@@ -206,9 +202,7 @@ async def webhook(request: Request):
             chat_id,
             "<b>Connect your AniList account.</b>\n"
             "\n"
-            "Tap the button below to open AniList and approve access for Kitsu. After approval you will return here and Kitsu will confirm the link.\n"
-            "\n"
-            "If the button does not open, send /login again for a fresh link. Links expire fast and work only once.",
+            "Tap the button below to approve access on AniList, then return here.",
             reply_markup=login_keyboard(login_url),
         )
 
@@ -217,11 +211,9 @@ async def webhook(request: Request):
         if not token:
             send_message(
                 chat_id,
-                "<b>No linked account found.</b>\n"
+                "<b>No linked account.</b>\n"
                 "\n"
-                "Kitsu cannot read your lists yet because no AniList account is connected to this chat.\n"
-                "\n"
-                "Send /login to connect your account, then try /me again.",
+                "Send /login to connect, then try again.",
             )
         else:
             name = fetch_viewer_name(token)
@@ -229,20 +221,18 @@ async def webhook(request: Request):
                 safe_name = html.escape(name)
                 send_message(
                     chat_id,
-                    f"<b>Linked account: {safe_name}.</b>\n"
+                    f"<b>{safe_name}.</b>\n"
                     "\n"
-                    "Kitsu is connected to this AniList profile. Updates you make here will sync to your AniList lists.\n"
+                    "This chat is linked to that AniList profile.\n"
                     "\n"
-                    "Use /login any time to switch accounts.",
+                    "Use /login to switch accounts.",
                 )
             else:
                 send_message(
                     chat_id,
-                    "<b>Link check failed.</b>\n"
+                    "<b>Link expired.</b>\n"
                     "\n"
-                    "The saved token for this chat is expired or invalid, so Kitsu cannot reach your AniList profile right now.\n"
-                    "\n"
-                    "Send /login to connect again with a fresh link.",
+                    "Send /login to connect again.",
                 )
 
     return {"ok": True}
@@ -273,9 +263,7 @@ async def callback(code: str = "", state: str = ""):
         chat_id,
         f"<b>Account linked: {safe_name}.</b>\n"
         "\n"
-        "Kitsu is now connected to this AniList profile. You can close the browser tab and return to chat.\n"
-        "\n"
-        "Send /me to verify your link any time.",
+        "You can close this tab and return to Telegram.",
     )
 
     return HTMLResponse(success_page(viewer["name"], viewer.get("avatar"), viewer.get("id")))
