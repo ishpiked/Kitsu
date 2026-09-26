@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from anilist.auth import build_authorize_url, exchange_code_for_token, fetch_viewer, fetch_viewer_name
-from database.tokens import get_token, save_token
+from database.tokens import get_token, pop_login_message, save_login_message, save_token
 
 app = FastAPI()
 
@@ -155,17 +155,34 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 
-def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> None:
+def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> int | None:
     if not BOT_TOKEN:
-        return
+        return None
     payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
-    requests.post(
-        f"{TELEGRAM_API}/sendMessage",
-        json=payload,
-        timeout=10,
-    )
+    try:
+        resp = requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            json=payload,
+            timeout=10,
+        )
+        return resp.json().get("result", {}).get("message_id")
+    except Exception:
+        return None
+
+
+def delete_message(chat_id: int, message_id: int) -> None:
+    if not BOT_TOKEN:
+        return
+    try:
+        requests.post(
+            f"{TELEGRAM_API}/deleteMessage",
+            json={"chat_id": chat_id, "message_id": message_id},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def login_keyboard(login_url: str) -> dict:
@@ -197,14 +214,19 @@ async def webhook(request: Request):
         )
 
     elif text == "/login":
+        old_prompt = pop_login_message(chat_id)
+        if old_prompt is not None:
+            delete_message(chat_id, old_prompt)
         login_url = build_authorize_url(chat_id)
-        send_message(
+        prompt_id = send_message(
             chat_id,
             "<b>Connect your AniList account.</b>\n"
             "\n"
             "Tap the button below to approve access on AniList, then return here.",
             reply_markup=login_keyboard(login_url),
         )
+        if prompt_id is not None:
+            save_login_message(chat_id, prompt_id)
 
     elif text == "/me":
         token = get_token(chat_id)
@@ -258,12 +280,15 @@ async def callback(code: str = "", state: str = ""):
         return HTMLResponse(error_page("Could not verify account", "Got a token but couldn't read your AniList profile."), status_code=400)
 
     save_token(chat_id, token)
+    old_prompt = pop_login_message(chat_id)
+    if old_prompt is not None:
+        delete_message(chat_id, old_prompt)
     safe_name = html.escape(viewer["name"])
     send_message(
         chat_id,
-        f"<b>Account linked: {safe_name}.</b>\n"
+        f"<b>Connected as {safe_name}.</b>\n"
         "\n"
-        "You can close this tab and return to Telegram.",
+        "All set. Your lists are ready to sync.",
     )
 
     return HTMLResponse(success_page(viewer["name"], viewer.get("avatar"), viewer.get("id")))
