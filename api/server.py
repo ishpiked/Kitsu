@@ -252,7 +252,7 @@ async def webhook(request: Request):
                 chat_id,
                 "<b>No linked account.</b>\n"
                 "\n"
-                "Send /login to connect, then try again.",
+                "Your AniList account hasn't been connected yet. Send /login to connect your account, then try again once the setup is complete.",
             )
         else:
             profile = fetch_user_profile(token)
