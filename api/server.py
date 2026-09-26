@@ -191,6 +191,29 @@ def delete_message(chat_id: int, message_id: int) -> None:
         pass
 
 
+def send_profile(chat_id: int, caption: str, banner: str | None) -> None:
+    """Profile goes out on the banner image when one exists, else as text."""
+    if not banner:
+        send_message(chat_id, caption)
+        return
+    try:
+        resp = requests.post(
+            f"{TELEGRAM_API}/sendPhoto",
+            json={
+                "chat_id": chat_id,
+                "photo": banner,
+                "caption": caption,
+                "parse_mode": "HTML",
+            },
+            timeout=15,
+        )
+        if resp.json().get("ok"):
+            return
+    except Exception:
+        pass
+    send_message(chat_id, caption)
+
+
 def login_keyboard(login_url: str) -> dict:
     return {"inline_keyboard": [[{"text": "Connect AniList Account", "url": login_url}]]}
 
@@ -290,7 +313,7 @@ async def webhook(request: Request):
                     "<b>Profile</b>",
                     "Your AniList account is connected and synced. Browse your library, track your progress, view detailed statistics, and discover new anime and manga directly from Telegram.",
                 ]
-                send_message(chat_id, "\n".join(lines))
+                send_profile(chat_id, "\n".join(lines), profile["banner"])
             else:
                 send_message(
                     chat_id,

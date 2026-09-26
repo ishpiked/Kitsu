@@ -13,6 +13,7 @@ query {
     name
     siteUrl
     avatar { large }
+    bannerImage
     about
     statistics {
       anime { count episodesWatched minutesWatched meanScore }
@@ -55,6 +56,7 @@ def fetch_user_profile(access_token: str) -> dict | None:
             "name": v.get("name"),
             "site_url": v.get("siteUrl"),
             "avatar": (v.get("avatar") or {}).get("large"),
+            "banner": v.get("bannerImage"),
             "about": _clean_about(v.get("about")),
             "anime_count": anime.get("count", 0),
             "episodes_watched": anime.get("episodesWatched", 0),
