@@ -15,7 +15,7 @@ query {
     avatar { large }
     about
     statistics {
-      anime { count episodesWatched meanScore }
+      anime { count episodesWatched minutesWatched meanScore }
       manga { count chaptersRead meanScore }
     }
   }
@@ -58,6 +58,7 @@ def fetch_user_profile(access_token: str) -> dict | None:
             "about": _clean_about(v.get("about")),
             "anime_count": anime.get("count", 0),
             "episodes_watched": anime.get("episodesWatched", 0),
+            "minutes_watched": anime.get("minutesWatched", 0),
             "anime_mean": anime.get("meanScore"),
             "manga_count": manga.get("count", 0),
             "chapters_read": manga.get("chaptersRead", 0),

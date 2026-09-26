@@ -186,36 +186,6 @@ def delete_message(chat_id: int, message_id: int) -> None:
         pass
 
 
-def send_photo(chat_id: int, photo_url: str, caption: str) -> int | None:
-    if not BOT_TOKEN:
-        return None
-    try:
-        resp = requests.post(
-            f"{TELEGRAM_API}/sendPhoto",
-            json={"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "HTML"},
-            timeout=15,
-        )
-        return resp.json().get("result", {}).get("message_id")
-    except Exception:
-        return None
-
-
-def profile_caption(profile: dict) -> str:
-    safe_name = html.escape(profile["name"] or "Unknown")
-    lines = [f"<b>{safe_name}</b>"]
-    if profile["about"]:
-        lines += ["", html.escape(profile["about"])]
-    lines += [
-        "",
-        "<b>Anime</b>",
-        f'{profile["anime_count"]:,} titles, {profile["episodes_watched"]:,} episodes watched',
-        "",
-        "<b>Manga</b>",
-        f'{profile["manga_count"]:,} titles, {profile["chapters_read"]:,} chapters read',
-    ]
-    return "\n".join(lines)
-
-
 def login_keyboard(login_url: str) -> dict:
     return {"inline_keyboard": [[{"text": "Connect AniList Account", "url": login_url}]]}
 
@@ -234,11 +204,13 @@ async def webhook(request: Request):
 
     if text == "/start":
         start_text = (
-            "<b>Kitsu, AniList on Telegram.</b>\n"
+            "Welcome to AniList Bot.\n"
             "\n"
-            "Search anime and manga, view details, and manage your AniList lists without leaving chat.\n"
+            "Your personal anime and manga companion, now available directly on Telegram. Connect your AniList account and explore a complete catalog of anime and manga, discover new titles, view detailed information, and keep track of everything you're watching or reading.\n"
             "\n"
-            "Connect your account to unlock list updates and sync."
+            "You can search for titles, explore characters, studios, genres, and recommendations, check what's currently airing, and manage your AniList library without leaving Telegram.\n"
+            "\n"
+            "Get started by connecting your AniList account and explore everything AniList has to offer, right from your chat."
         )
         if get_token(chat_id):
             send_message(chat_id, start_text)
@@ -258,9 +230,11 @@ async def webhook(request: Request):
         login_url = build_authorize_url(chat_id)
         prompt_id = send_message(
             chat_id,
-            "<b>Connect your AniList account.</b>\n"
+            "Connect your AniList account.\n"
             "\n"
-            "Tap the button below to approve access on AniList, then return here.",
+            "Tap the button below to authorize AniList access for this bot. Once authorization is complete, return to Telegram to continue setting up your account.\n"
+            "\n"
+            "Your AniList account will allow the bot to access your library and provide personalized anime and manga features.",
             reply_markup=login_keyboard(login_url),
         )
         if prompt_id is not None:
@@ -278,11 +252,40 @@ async def webhook(request: Request):
         else:
             profile = fetch_user_profile(token)
             if profile:
-                caption = profile_caption(profile)
-                if profile["avatar"]:
-                    send_photo(chat_id, profile["avatar"], caption)
+                safe_name = html.escape(profile["name"] or "Unknown")
+                lines = [f'<b><a href="{profile["site_url"]}">{safe_name}</a></b>']
+                if profile["about"]:
+                    lines += ["", html.escape(profile["about"])]
+                hours = (profile["minutes_watched"] or 0) // 60
+                if profile["anime_count"]:
+                    anime_line = (
+                        f'{profile["anime_count"]:,} titles watched, '
+                        f'with {profile["episodes_watched"]:,} episodes completed '
+                        f'across a total of {hours:,} hours watched.'
+                    )
+                    if profile["anime_mean"] is not None:
+                        anime_line += f' Mean score: {profile["anime_mean"]}%.'
                 else:
-                    send_message(chat_id, caption)
+                    anime_line = "No titles watched so far."
+                if profile["manga_count"]:
+                    manga_line = (
+                        f'{profile["manga_count"]:,} titles read, '
+                        f'with {profile["chapters_read"]:,} chapters completed.'
+                    )
+                else:
+                    manga_line = "No titles read so far."
+                lines += [
+                    "",
+                    "<b>Anime</b>",
+                    anime_line,
+                    "",
+                    "<b>Manga</b>",
+                    manga_line,
+                    "",
+                    "<b>Profile</b>",
+                    "Your AniList account is connected and synced. Browse your library, track your progress, view detailed statistics, and discover new anime and manga directly from Telegram.",
+                ]
+                send_message(chat_id, "\n".join(lines))
             else:
                 send_message(
                     chat_id,
