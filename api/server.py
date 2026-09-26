@@ -20,10 +20,26 @@ body {
   color: #FFFFFF;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+.sitehead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 18px 22px;
+}
+.sitehead .logo { display: inline-flex; width: 30px; height: 30px; border-radius: 9px; overflow: hidden; background: #161619; border: 1px solid #29292E; }
+.sitehead .logo svg { width: 100%; height: 100%; display: block; }
+.sitehead .name { font-size: 17px; font-weight: 800; letter-spacing: .2px; line-height: 1.1; }
+.sitehead .name small { display: block; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #A5A5AA; margin-top: 3px; }
+.wrap {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  -webkit-font-smoothing: antialiased;
+  padding: 12px 20px 28px;
 }
 .card {
   background: #161619;
@@ -33,15 +49,6 @@ body {
   width: 100%;
   overflow: hidden;
 }
-.top {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #29292E;
-}
-.wordmark { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: .2px; }
-.wordmark .logo { display: inline-flex; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; background: #0D0D0F; border: 1px solid #29292E; }
-.wordmark .logo svg { width: 100%; height: 100%; display: block; }
-.wordmark small { font-size: 10px; font-weight: 600; letter-spacing: 1.5px; color: #A5A5AA; display: block; line-height: 1; margin-top: 2px; }
 .pill {
   font-size: 11px; font-weight: 700; letter-spacing: 1px;
   padding: 5px 10px; border-radius: 999px;
@@ -66,6 +73,8 @@ body {
   font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
   color: #A5A5AA; margin-bottom: 8px;
 }
+.statusrow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.statusrow .eyebrow { margin-bottom: 0; }
 h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.2; }
 h1 span { color: #FF4968; }
 .sub { color: #A5A5AA; font-size: 14px; line-height: 1.6; margin-top: 10px; }
@@ -110,18 +119,17 @@ def success_page(name: str, avatar: str | None, user_id: int | None = None) -> s
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Connected — Kitsu</title>{FONT_HEAD}<style>{PAGE_CSS}</style></head>
-<body><div class="card">
-<div class="top"><div class="wordmark">{LOGO_SVG}<span>Kitsu<small>ANILIST ON TELEGRAM</small></span></div><div class="pill ok">CONNECTED</div></div>
+<body><header class="sitehead">{LOGO_SVG}<div class="name">Kitsu<small>ANILIST ON TELEGRAM</small></div></header><div class="wrap"><div class="card">
 <div class="main">
+<div class="statusrow"><div class="eyebrow">ANILIST ACCOUNT</div><div class="pill ok">CONNECTED</div></div>
 {visual}
-<div class="eyebrow">ANILIST ACCOUNT</div>
 <h1>You&rsquo;re in, <span>{name}</span></h1>
 <p class="sub">Account linked. Anything you update from Telegram syncs straight to your AniList.</p>
 <div class="userline"><span class="dot"></span><b>{name}</b>{idtag}</div>
-<a class="btn" href="https://t.me/">Return to Telegram</a>
+<a class="btn" href="https://t.me/AniKitsuBot">Return to Telegram</a>
 </div>
 <div class="foot">You can close this tab now.</div>
-</div></body></html>"""
+</div></div></body></html>"""
 
 
 def error_page(title: str, detail: str) -> str:
@@ -129,19 +137,18 @@ def error_page(title: str, detail: str) -> str:
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Login failed — Kitsu</title>{FONT_HEAD}<style>{PAGE_CSS}</style></head>
-<body><div class="card">
-<div class="top"><div class="wordmark">{LOGO_SVG}<span>Kitsu<small>ANILIST ON TELEGRAM</small></span></div><div class="pill err">FAILED</div></div>
+<body><header class="sitehead">{LOGO_SVG}<div class="name">Kitsu<small>ANILIST ON TELEGRAM</small></div></header><div class="wrap"><div class="card">
 <div class="main">
+<div class="statusrow"><div class="eyebrow">LOGIN ISSUE</div><div class="pill err">FAILED</div></div>
 <div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none">
 <path d="M6 6l12 12M18 6L6 18" stroke="#A5A5AA" stroke-width="2.2" stroke-linecap="round"/></svg></div>
-<div class="eyebrow">LOGIN ISSUE</div>
 <h1>{title}</h1>
 <p class="sub">{detail}</p>
-<a class="btn" href="https://t.me/">Back to Telegram</a>
-<a class="ghost" href="https://t.me/">Send /login again for a fresh link</a>
+<a class="btn" href="https://t.me/AniKitsuBot">Back to Telegram</a>
+<a class="ghost" href="https://t.me/AniKitsuBot">Send /login again for a fresh link</a>
 </div>
 <div class="foot">Codes expire fast and work only once.</div>
-</div></body></html>"""
+</div></div></body></html>"""
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
