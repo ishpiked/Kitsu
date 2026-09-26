@@ -159,7 +159,12 @@ TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> int | None:
     if not BOT_TOKEN:
         return None
-    payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    payload: dict = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
     try:
