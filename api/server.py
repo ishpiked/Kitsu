@@ -22,8 +22,14 @@ async def webhook(request: Request):
 
     if text == "/start":
         welcome_message = (
-            "hey! welcome to the bot.\n\n"
-            "you're successfully connected to telegram."
+            """Welcome to AniList Bot.
+
+Your personal anime and manga companion, now available directly on Telegram. Connect your AniList account and explore a complete catalog of anime and manga, discover new titles, view detailed information, and keep track of everything you're watching or reading.
+
+You can search for titles, explore characters, studios, genres, and recommendations, check what's currently airing, and manage your AniList library without leaving Telegram.
+
+Get started by connecting your AniList account and explore everything AniList has to offer, right from your chat.
+"""
         )
 
         requests.post(
