@@ -30,7 +30,7 @@ body {
   display: flex; align-items: center; gap: 10px;
   padding: 18px 22px;
 }
-.sitehead .logo { display: inline-flex; width: 36px; height: 36px; }
+.sitehead .logo { display: inline-flex; width: 46px; height: 46px; }
 .sitehead .logo svg { width: 100%; height: 100%; display: block; }
 .sitehead .name { font-size: 17px; font-weight: 800; letter-spacing: .2px; line-height: 1.1; }
 .sitehead .name small { display: block; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #A5A5AA; margin-top: 3px; }
