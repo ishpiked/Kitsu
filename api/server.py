@@ -1,11 +1,14 @@
 import html
 import os
+import time
+from datetime import datetime, timezone
+
 import requests
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from anilist.auth import build_authorize_url, exchange_code_for_token, fetch_viewer, fetch_viewer_name
-from anilist.media import clean_description, media_title, prequel_sequel, search_characters, search_media
+from anilist.media import airing_soon, clean_description, media_title, next_airing, prequel_sequel, search_characters, search_media, search_studios
 from anilist.profile import fetch_user_profile
 from database.tokens import get_token, pop_login_message, remove_token, save_login_message, save_token
 
@@ -318,6 +321,27 @@ def usage_text(kind: str, example: str) -> str:
     )
 
 
+def airing_delta(seconds: int | None) -> str:
+    if seconds is None:
+        return "soon"
+    if seconds <= 0:
+        return "now"
+    days, rest = divmod(int(seconds), 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes, _ = divmod(rest, 60)
+    if days:
+        return f"in {days} days {hours} hours" if hours else f"in {days} days"
+    if hours:
+        return f"in {hours} hours {minutes} minutes" if minutes else f"in {hours} hours"
+    return f"in {minutes} minutes" if minutes else "now"
+
+
+def airing_day(timestamp: int | None) -> str | None:
+    if not timestamp:
+        return None
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%d %b %Y")
+
+
 def no_matches(query: str) -> str:
     return (
         "<b>No matches.</b>\n"
@@ -484,6 +508,9 @@ async def webhook(request: Request):
             "/anilist, list of anime matching a query.\n"
             "/manga, details on one manga.\n"
             "/character, characters matching a name.\n"
+            "/airing, next episode air date for an anime.\n"
+            "/schedule, anime airing over the next days.\n"
+            "/studio, studios matching a name.\n"
             "\n"
             "More commands are on the way.",
         )
@@ -515,6 +542,73 @@ async def webhook(request: Request):
                 "\n"
                 "This chat has no linked account.",
             )
+
+    elif base == "/airing":
+        if not arg:
+            send_message(chat_id, usage_text("Airing lookup", "/airing One Piece"))
+        else:
+            show = next_airing(arg)
+            if not show:
+                send_message(chat_id, no_matches(arg))
+            else:
+                title = html.escape(media_title(show))
+                nxt = show.get("nextAiringEpisode") or {}
+                if nxt.get("episode"):
+                    day = airing_day(nxt.get("airingAt"))
+                    when = f', on {day}.' if day else '.'
+                    send_message(
+                        chat_id,
+                        f'<b><a href="{show["siteUrl"]}">{title}</a></b>\n'
+                        "\n"
+                        f'Episode {nxt["episode"]} airs {airing_delta(nxt.get("timeUntilAiring"))}{when}',
+                    )
+                else:
+                    send_message(
+                        chat_id,
+                        f'<b><a href="{show["siteUrl"]}">{title}</a></b>\n'
+                        "\n"
+                        "No upcoming episodes. The show has finished airing.",
+                    )
+
+    elif base == "/schedule":
+        now = int(time.time())
+        slots = airing_soon(now, now + 7 * 86400, 10)
+        if not slots:
+            send_message(
+                chat_id,
+                "<b>Airing soon.</b>\n"
+                "\n"
+                "Nothing scheduled over the next days.",
+            )
+        else:
+            lines = ["<b>Airing soon.</b>", ""]
+            for s in slots:
+                m = s.get("media") or {}
+                title = html.escape(media_title(m))
+                lines.append(
+                    f'<a href="{m.get("siteUrl", "https://anilist.co")}">{title}</a>, '
+                    f'episode {s.get("episode")}, {airing_delta(s.get("timeUntilAiring"))}.'
+                )
+            send_message(chat_id, "\n".join(lines))
+
+    elif base == "/studio":
+        if not arg:
+            send_message(chat_id, usage_text("Studio search", "/studio MAPPA"))
+        else:
+            found = search_studios(arg, 5)
+            if not found:
+                send_message(chat_id, no_matches(arg))
+            else:
+                lines = [f"<b>Studios matching {html.escape(arg)}.</b>", ""]
+                for i, st in enumerate(found, 1):
+                    name = html.escape(st.get("name") or "Unknown")
+                    known = ", ".join(
+                        html.escape((n.get("title") or {}).get("romaji") or "")
+                        for n in (st.get("media") or {}).get("nodes", []) or []
+                    ).strip(", ")
+                    suffix = f" ({known})" if known else ""
+                    lines.append(f'{i}. <a href="{st["siteUrl"]}">{name}</a>{suffix}')
+                send_message(chat_id, "\n".join(lines))
 
     return {"ok": True}
 

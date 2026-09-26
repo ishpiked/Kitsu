@@ -35,6 +35,27 @@ _SEARCH_MEDIA = (
 
 _MEDIA_BY_ID = "query ($id: Int) { Media(id: $id) {" + _MEDIA_FIELDS + "} }"
 
+_NEXT_AIRING = (
+    "query ($q: String) { Media(search: $q, type: ANIME) {"
+    " id title { romaji english } siteUrl"
+    " nextAiringEpisode { episode airingAt timeUntilAiring } } }"
+)
+
+_SCHEDULE = (
+    "query ($from: Int, $to: Int, $n: Int) {"
+    " Page(perPage: $n) { airingSchedules("
+    " airingAt_greater: $from, airingAt_lesser: $to, sort: TIME) {"
+    " episode airingAt timeUntilAiring"
+    " media { title { romaji english } siteUrl } } } }"
+)
+
+_SEARCH_STUDIOS = (
+    "query ($q: String, $n: Int) {"
+    " Page(perPage: $n) { studios(search: $q) {"
+    " id name siteUrl"
+    " media(sort: POPULARITY_DESC, perPage: 3) { nodes { title { romaji } } }"
+    " } } }"
+)
 _SEARCH_CHARACTER = (
     "query ($q: String, $n: Int) {"
     " Page(perPage: $n) { characters(search: $q) {"
@@ -114,3 +135,33 @@ def prequel_sequel(m: dict) -> tuple[dict | None, dict | None]:
         elif e.get("relationType") == "SEQUEL" and seq is None:
             seq = node
     return pre, seq
+
+
+def search_studios(query: str, per_page: int = 5) -> list[dict]:
+    data = _post(_SEARCH_STUDIOS, {"q": query, "n": per_page})
+    if not data:
+        return []
+    try:
+        return data["Page"]["studios"] or []
+    except (KeyError, TypeError):
+        return []
+
+
+def next_airing(query: str) -> dict | None:
+    data = _post(_NEXT_AIRING, {"q": query})
+    if not data:
+        return None
+    try:
+        return data["Media"]
+    except (KeyError, TypeError):
+        return None
+
+
+def airing_soon(from_ts: int, to_ts: int, per_page: int = 10) -> list[dict]:
+    data = _post(_SCHEDULE, {"from": from_ts, "to": to_ts, "n": per_page})
+    if not data:
+        return []
+    try:
+        return data["Page"]["airingSchedules"] or []
+    except (KeyError, TypeError):
+        return []
