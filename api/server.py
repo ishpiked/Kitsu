@@ -186,6 +186,36 @@ def delete_message(chat_id: int, message_id: int) -> None:
         pass
 
 
+def send_photo(chat_id: int, photo_url: str, caption: str) -> int | None:
+    if not BOT_TOKEN:
+        return None
+    try:
+        resp = requests.post(
+            f"{TELEGRAM_API}/sendPhoto",
+            json={"chat_id": chat_id, "photo": photo_url, "caption": caption, "parse_mode": "HTML"},
+            timeout=15,
+        )
+        return resp.json().get("result", {}).get("message_id")
+    except Exception:
+        return None
+
+
+def profile_caption(profile: dict) -> str:
+    safe_name = html.escape(profile["name"] or "Unknown")
+    lines = [f"<b>{safe_name}</b>"]
+    if profile["about"]:
+        lines += ["", html.escape(profile["about"])]
+    lines += [
+        "",
+        "<b>Anime</b>",
+        f'{profile["anime_count"]:,} titles, {profile["episodes_watched"]:,} episodes watched',
+        "",
+        "<b>Manga</b>",
+        f'{profile["manga_count"]:,} titles, {profile["chapters_read"]:,} chapters read',
+    ]
+    return "\n".join(lines)
+
+
 def login_keyboard(login_url: str) -> dict:
     return {"inline_keyboard": [[{"text": "Connect AniList Account", "url": login_url}]]}
 
@@ -248,19 +278,11 @@ async def webhook(request: Request):
         else:
             profile = fetch_user_profile(token)
             if profile:
-                safe_name = html.escape(profile["name"] or "Unknown")
-                lines = [f'<b><a href="{profile["site_url"]}">{safe_name}</a></b>']
-                if profile["about"]:
-                    lines += ["", html.escape(profile["about"])]
-                lines += [
-                    "",
-                    "<b>Anime</b>",
-                    f'{profile["anime_count"]:,} titles, {profile["episodes_watched"]:,} episodes watched',
-                    "",
-                    "<b>Manga</b>",
-                    f'{profile["manga_count"]:,} titles, {profile["chapters_read"]:,} chapters read',
-                ]
-                send_message(chat_id, "\n".join(lines))
+                caption = profile_caption(profile)
+                if profile["avatar"]:
+                    send_photo(chat_id, profile["avatar"], caption)
+                else:
+                    send_message(chat_id, caption)
             else:
                 send_message(
                     chat_id,
